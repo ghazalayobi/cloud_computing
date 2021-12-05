@@ -1,0 +1,196 @@
+---
+title: "CEU-cloud-computing-assignment-3"
+author: "Ghazal Ayobi"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+*Installation*
+```{r warning=FALSE, message=FALSE}
+#Cleaning the environment 
+rm(list = ls())
+
+# Installing Packages
+#install.packages("httr")
+#install.packages("aws.s3")
+#install.packages("rvest")
+#install.packages("xlm2")
+#install.packages("data.table")
+#install.packages("aws.comprehend")
+#install.packages("tidyr")
+#install.packages("dplyr")
+#install.packages("tidyverse")
+
+library(httr)
+library(aws.s3)
+library(rvest)
+library(xml2)
+library(data.table)
+library(aws.comprehend)
+library(tidyr)
+library(dplyr)
+library(tidyverse)
+
+```
+
+
+Set up
+```{r warning=FALSE, message=FALSE}
+keyfile = list.files(path=".", pattern="accessKeys.csv", full.names=TRUE)
+if (identical(keyfile, character(0))){
+  stop("ERROR: AWS key file not found")
+} 
+
+keyTable <- read.csv(keyfile, header = T) # *accessKeys.csv == the CSV downloaded from AWS containing your Access & Secret keys
+AWS_ACCESS_KEY_ID <- as.character(keyTable$Access.key.ID)
+AWS_SECRET_ACCESS_KEY <- as.character(keyTable$Secret.access.key)
+
+#activate
+Sys.setenv("AWS_ACCESS_KEY_ID" = AWS_ACCESS_KEY_ID,
+           "AWS_SECRET_ACCESS_KEY" = AWS_SECRET_ACCESS_KEY,
+           "AWS_DEFAULT_REGION" = "eu-west-1") 
+```
+
+
+LinkedIn Response
+```{r warning=FALSE, message=FALSE}
+# LinkedIn
+
+link_l <- read_html("https://news.linkedin.com/2021/june/an-update-from-linkedin")
+title_l <- link_l %>% html_node(".blog-post-title") %>% html_text()
+content_l <- link_l %>% html_nodes("p:nth-child(1), p:nth-child(2), p:nth-child(2)") %>% html_text()
+
+
+# Here is how we can check article's language
+detect_language(title_l)
+detect_language(content_l)
+
+# Here is how to do sentiment analysis
+sentiment_t_l <- detect_sentiment(title_l)
+sentiment_c_l <- detect_sentiment(content_l)
+
+sentiment_c_l$Sentiment <- NULL
+linkedin <- sentiment_c_l %>% gather("sentiment", "rank", -1)
+
+```
+
+```{r warning=FALSE, message=FALSE}
+
+# JDSUPRA
+
+link_jd <- read_html("https://www.jdsupra.com/legalnews/what-happened-on-linkedin-3826345/")
+title_jd <- link_jd %>% html_node(".mv0") %>% html_text()
+content_jd <- link_jd %>% html_nodes("p:nth-child(2), p:nth-child(3), p:nth-child(5), p:nth-child(7), p:nth-child(8), .p:nth-child(9), p:nth-child(10), ul:nth-child(11), p:nth-child(12)") %>% html_text()
+
+
+# Here is how to do sentiment analysis
+news_t_jd <- detect_sentiment(title_jd)
+news_c_jd <- detect_sentiment(content_jd)
+
+news_c_jd$Sentiment <- NULL
+
+jdsupra <- news_c_jd %>% gather("sentiment", "rank", -1)
+
+```
+
+
+```{r warning=FALSE, message=FALSE}
+# Privacy Sharks
+
+link_ps <- read_html("https://www.privacysharks.com/exclusive-700-million-linkedin-records-for-sale-on-hacker-forum-june-22nd-2021/")
+title_ps <- link_ps %>% html_nodes("h1") %>% html_text()
+content_ps <- link_ps %>% html_nodes(" p:nth-child(3), p:nth-child(4), p:nth-child(5), p:nth-child(6), p:nth-child(15), p:nth-child(16), p:nth-child(17), p:nth-child(18)") %>% html_text()
+
+# Here is how to do sentiment analysis
+sentiment_t_ps <- detect_sentiment(title_ps)
+sentiment_c_ps <- detect_sentiment(content_ps)
+
+sentiment_c_ps$Sentiment <- NULL
+
+privacy_sharks <- sentiment_c_ps %>% gather("sentiment", "rank", -1)
+```
+
+```{r warning=FALSE, message=FALSE}
+linkedin$website <- "linkedin" 
+jdsupra$website <- "jdsupra" 
+privacy_sharks$website <- "privacy_sharks" 
+
+df <- rbind(linkedin, jdsupra, privacy_sharks)
+df <- df %>% mutate(id = row_number())
+```
+
+
+```{r warning=FALSE, message=FALSE}
+# Figures
+
+f1 <- ggplot(df, aes(x=Index, y= rank, fill=sentiment)) +
+  geom_bar(stat = "identity", position="fill") + 
+  scale_fill_manual(values=c("#293241", "#3d5a80", "#98c1d9", "#e0fbfc" )) + 
+  theme_light() +
+  ggtitle("Websites Sentiment Analysis") +
+   labs(x = "Paragraph",y = "Sentiment Rank") +
+   facet_wrap(vars(website))
+
+f1
+
+```
+
+```{r warning=FALSE, message=FALSE}
+f2 <- ggplot(df) +
+ aes(x = website, fill = sentiment, y = rank) +
+ geom_bar(stat = "identity", position="fill") +
+scale_fill_manual(values=c("#293241", "#3d5a80", "#98c1d9", "#e0fbfc" ))  + 
+theme_light()
+f2
+
+```
+
+```{r warning=FALSE, message=FALSE}
+f3 <- ggplot(data = df, aes(x = sentiment, y = rank)) +
+  geom_point(color = "#3a5e8cFF", size = 4) + 
+  labs(x = "Grade92 (Education Levels)",y = "ln(earnings per hour)")+
+  theme_light() +
+  ggtitle("Figure 1")
+f3
+
+```
+
+
+```{r warning=FALSE, message=FALSE}
+f4 <- ggplot(data = df %>% filter(df$sentiment == "Negative"), aes(x = website, y = rank)) +
+  geom_point(color = "#3a5e8cFF", size = 4) + 
+  labs(x = "Website",y = "Negative Sentiment Ranking")+
+  theme_light() +
+  ggtitle("Websites Negative Sentiment")
+f4
+```
+
+
+
+```{r warning=FALSE, message=FALSE}
+entities_c_l <- detect_entities(content_l)
+entities_c_jd <- detect_entities(content_jd)
+entities_c_ps <- detect_entities(content_ps)
+
+entities_c_l$website <- "linkedin"
+entities_c_jd$website <- "jdsupra" 
+entities_c_ps$website <- "privacy_sharks" 
+
+df_entities <- rbind(entities_c_l, entities_c_jd, entities_c_ps )
+df_entities <- df_entities %>% mutate(id = row_number())
+```
+
+```{r warning=FALSE, message=FALSE}
+
+f5 <- ggplot(df_entities) +
+ aes(x = Type, fill = website, weight = Score) +
+ geom_bar() +
+ scale_fill_manual(values=c("#293241", "#3d5a80", "#98c1d9", "#e0fbfc" )) +
+ theme_minimal()
+f5
+
+```
+
