@@ -151,9 +151,9 @@ f2
 ```{r warning=FALSE, message=FALSE}
 f3 <- ggplot(data = df, aes(x = sentiment, y = rank)) +
   geom_point(color = "#3a5e8cFF", size = 4) + 
-  labs(x = "Grade92 (Education Levels)",y = "ln(earnings per hour)")+
+  labs(x = "Sentiment",y = "Sentiment Ranking")+
   theme_light() +
-  ggtitle("Figure 1")
+  ggtitle("Sentiment Analysis of all Websites")
 f3
 
 ```
@@ -164,7 +164,7 @@ f4 <- ggplot(data = df %>% filter(df$sentiment == "Negative"), aes(x = website, 
   geom_point(color = "#3a5e8cFF", size = 4) + 
   labs(x = "Website",y = "Negative Sentiment Ranking")+
   theme_light() +
-  ggtitle("Websites Negative Sentiment")
+  ggtitle("Negative Sentiment Analysis of all Websites")
 f4
 ```
 
